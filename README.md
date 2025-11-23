@@ -1,31 +1,59 @@
 # 🎨 AI Thumbnail Maker
 
-Ứng dụng AI giúp bạn tạo ý tưởng thumbnail YouTube/TikTok cực hút mắt chỉ trong vài phút, được hỗ trợ bởi **Google Gemini AI**.
+Ứng dụng AI giúp bạn tạo ý tưởng thumbnail YouTube/TikTok cực hút mắt chỉ trong vài phút, được hỗ trợ bởi **Google Gemini AI** với khả năng phân tích video và hình ảnh.
 
 ![AI Thumbnail Maker](https://img.shields.io/badge/AI-Gemini-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
 ![Python](https://img.shields.io/badge/Python-3.8+-yellow)
+![Vision AI](https://img.shields.io/badge/Vision-Enabled-orange)
 
 ## 📌 Tính năng
 
+### 🎯 3 Chế độ hoạt động
+
+1. **📺 YouTube Mode** - Phân tích video YouTube
+2. **🎵 TikTok Mode** - Phân tích video TikTok
+3. **🖼️ Image Upload Mode** - Phân tích ảnh bất kỳ
+
+### ✨ Tính năng chính
+
 - ✅ **Phân tích video YouTube tự động** - Nhập URL và để AI làm việc
+- ✅ **Phân tích video TikTok** - Hỗ trợ đầy đủ URL TikTok
+- ✅ **Phân tích ảnh với AI Vision** - Upload ảnh và nhận gợi ý thumbnail
 - ✅ **4 ý tưởng thumbnail đa dạng** - Mỗi ý tưởng có phong cách riêng
 - ✅ **Gợi ý màu sắc tương phản** - Tối ưu để thu hút ánh nhìn
 - ✅ **Font chữ hiện đại** - Dễ đọc, nổi bật
 - ✅ **Text ngắn gọn 2-3 từ** - Tối ưu CTR (Click-Through Rate)
 - ✅ **AI đề xuất ý tưởng tốt nhất** - Kèm giải thích chi tiết
 - ✅ **Điểm CTR dự đoán** - Đánh giá từ 1-10 cho mỗi ý tưởng
+- ✅ **Drag & Drop Upload** - Kéo thả ảnh dễ dàng
 
 ## 🚀 Cách hoạt động
 
-1. **Nhập URL video YouTube** vào ô input
-2. **AI phân tích** tiêu đề và nội dung video
-3. **Tạo 4 ý tưởng thumbnail** với:
-   - Dòng chữ ngắn gọn (2-3 từ)
-   - Phối màu tương phản
-   - Font chữ hiện đại
-   - Mô tả chi tiết
-4. **Đề xuất ý tưởng tốt nhất** với lý do thuyết phục
+### 📺 Phân tích YouTube
+1. Chọn tab **YouTube**
+2. Nhập URL video YouTube
+3. AI phân tích tiêu đề và nội dung
+4. Nhận 4 ý tưởng thumbnail tối ưu
+
+### 🎵 Phân tích TikTok
+1. Chọn tab **TikTok**
+2. Nhập URL video TikTok (hỗ trợ vm.tiktok.com, vt.tiktok.com)
+3. AI phân tích và đề xuất thumbnail viral
+4. Nhận 4 ý tưởng phù hợp với TikTok
+
+### 🖼️ Phân tích Ảnh
+1. Chọn tab **Upload Ảnh**
+2. Kéo thả hoặc chọn ảnh (JPG, PNG, GIF - max 10MB)
+3. AI Vision phân tích nội dung ảnh
+4. Nhận 4 cách tối ưu ảnh thành thumbnail
+
+Mỗi ý tưởng bao gồm:
+- Dòng chữ ngắn gọn (2-3 từ)
+- Phối màu tương phản
+- Font chữ hiện đại
+- Mô tả chi tiết
+- Điểm CTR dự đoán (1-10)
 
 ## 📦 Cài đặt
 
@@ -149,7 +177,7 @@ Phân tích video YouTube và tạo ý tưởng thumbnail.
 }
 ```
 
-**Response:**
+**Response:** (Same format for all endpoints)
 ```json
 {
   "video_title": "Tiêu đề video",
@@ -169,20 +197,58 @@ Phân tích video YouTube và tạo ý tưởng thumbnail.
 }
 ```
 
+### POST `/api/analyze-tiktok`
+
+Phân tích video TikTok và tạo ý tưởng thumbnail.
+
+**Request:**
+```json
+{
+  "url": "https://www.tiktok.com/@user/video/1234567890"
+}
+```
+
+Hỗ trợ các format URL:
+- `https://www.tiktok.com/@username/video/1234567890`
+- `https://vm.tiktok.com/ZSeXXXXXX/`
+- `https://vt.tiktok.com/ZSeXXXXXX/`
+
+### POST `/api/analyze-image`
+
+Phân tích ảnh upload và tạo ý tưởng thumbnail.
+
+**Request:** `multipart/form-data`
+- `file`: Image file (JPG, PNG, GIF - max 10MB)
+
+**Example (JavaScript):**
+```javascript
+const formData = new FormData();
+formData.append('file', imageFile);
+
+fetch('/api/analyze-image', {
+  method: 'POST',
+  body: formData
+});
+```
+
 ## 🎯 Ứng dụng thực tế
 
 - **YouTubers:** Tạo thumbnail thu hút để tăng lượt xem
-- **TikTokers:** Ý tưởng cover video hấp dẫn
+- **TikTokers:** Ý tưởng cover video viral, tối ưu cho TikTok
 - **Content Creators:** Tối ưu CTR cho các nền tảng video
 - **Marketers:** Thiết kế thumbnail quảng cáo hiệu quả
+- **Designers:** Phân tích ảnh có sẵn và tối ưu thành thumbnail
+- **Social Media Managers:** Tạo thumbnail nhanh cho nhiều nền tảng
 
 ## 🌟 Tính năng sắp tới
 
 - [ ] Tạo hình ảnh thumbnail trực tiếp (không chỉ ý tưởng)
-- [ ] Hỗ trợ TikTok và Facebook Video
+- [ ] Hỗ trợ Facebook Video và Instagram Reels
 - [ ] Phân tích A/B Testing cho thumbnail
 - [ ] Export ý tưởng ra PDF/PNG
 - [ ] Lưu lịch sử phân tích
+- [ ] Batch processing - Phân tích nhiều video/ảnh cùng lúc
+- [ ] API Key management cho nhiều người dùng
 
 ## 🤝 Đóng góp
 

@@ -14,30 +14,97 @@
                 <span class="logo-icon">🎨</span>
                 <h1>AI Thumbnail Maker</h1>
             </div>
-            <p class="subtitle">Tạo thumbnail YouTube/TikTok hút mắt chỉ trong vài giây với AI</p>
+            <p class="subtitle">Tạo thumbnail YouTube/TikTok hút mắt từ URL hoặc ảnh với AI</p>
         </header>
 
-        <!-- Input Section -->
-        <section class="input-section">
-            <div class="input-container">
-                <input
-                    type="text"
-                    id="videoUrl"
-                    placeholder="Nhập URL video YouTube (vd: https://youtube.com/watch?v=...)"
-                    class="url-input"
-                >
-                <button onclick="analyzeVideo()" id="analyzeBtn" class="analyze-btn">
-                    <span id="btnText">Phân Tích Video</span>
-                    <span id="btnLoader" class="loader hidden"></span>
+        <!-- Tabs -->
+        <section class="tabs-section">
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('youtube')">
+                    <span class="tab-icon">📺</span>
+                    YouTube
+                </button>
+                <button class="tab-button" onclick="switchTab('tiktok')">
+                    <span class="tab-icon">🎵</span>
+                    TikTok
+                </button>
+                <button class="tab-button" onclick="switchTab('image')">
+                    <span class="tab-icon">🖼️</span>
+                    Upload Ảnh
                 </button>
             </div>
-            <p class="hint">💡 App sẽ phân tích video và đề xuất 4 ý tưởng thumbnail tối ưu CTR</p>
+        </section>
+
+        <!-- YouTube Tab -->
+        <section id="youtubeTab" class="tab-content active">
+            <div class="input-section">
+                <div class="input-container">
+                    <input
+                        type="text"
+                        id="youtubeUrl"
+                        placeholder="Nhập URL video YouTube (vd: https://youtube.com/watch?v=...)"
+                        class="url-input"
+                    >
+                    <button onclick="analyzeYouTube()" id="analyzeYouTubeBtn" class="analyze-btn">
+                        <span id="btnTextYT">Phân Tích Video</span>
+                        <span id="btnLoaderYT" class="loader hidden"></span>
+                    </button>
+                </div>
+                <p class="hint">💡 AI sẽ phân tích video YouTube và đề xuất 4 ý tưởng thumbnail tối ưu CTR</p>
+            </div>
+        </section>
+
+        <!-- TikTok Tab -->
+        <section id="tiktokTab" class="tab-content">
+            <div class="input-section">
+                <div class="input-container">
+                    <input
+                        type="text"
+                        id="tiktokUrl"
+                        placeholder="Nhập URL video TikTok (vd: https://tiktok.com/@user/video/...)"
+                        class="url-input"
+                    >
+                    <button onclick="analyzeTikTok()" id="analyzeTikTokBtn" class="analyze-btn">
+                        <span id="btnTextTT">Phân Tích Video</span>
+                        <span id="btnLoaderTT" class="loader hidden"></span>
+                    </button>
+                </div>
+                <p class="hint">🎵 AI sẽ phân tích video TikTok và đề xuất thumbnail viral nhất</p>
+            </div>
+        </section>
+
+        <!-- Image Upload Tab -->
+        <section id="imageTab" class="tab-content">
+            <div class="input-section">
+                <div class="upload-container">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📤</div>
+                        <p class="upload-text">Kéo thả ảnh vào đây hoặc click để chọn</p>
+                        <p class="upload-hint">Hỗ trợ: JPG, PNG, GIF (Max 10MB)</p>
+                        <input
+                            type="file"
+                            id="imageInput"
+                            accept="image/*"
+                            style="display: none;"
+                        >
+                    </div>
+                    <div id="imagePreview" class="image-preview hidden">
+                        <img id="previewImg" src="" alt="Preview">
+                        <button onclick="removeImage()" class="remove-btn">✕ Xóa</button>
+                    </div>
+                </div>
+                <button onclick="analyzeImage()" id="analyzeImageBtn" class="analyze-btn" style="width: 100%; margin-top: 15px;" disabled>
+                    <span id="btnTextImg">Phân Tích Ảnh</span>
+                    <span id="btnLoaderImg" class="loader hidden"></span>
+                </button>
+                <p class="hint">🖼️ AI sẽ phân tích ảnh và đề xuất cách tối ưu thành thumbnail</p>
+            </div>
         </section>
 
         <!-- Loading State -->
         <div id="loadingState" class="loading-state hidden">
             <div class="spinner"></div>
-            <p>Đang phân tích video với Google Gemini AI...</p>
+            <p>Đang phân tích với Google Gemini AI...</p>
         </div>
 
         <!-- Error State -->
@@ -48,7 +115,7 @@
 
         <!-- Results Section -->
         <section id="resultsSection" class="results-section hidden">
-            <!-- Video Info -->
+            <!-- Video/Image Info -->
             <div class="video-info">
                 <h2 id="videoTitle"></h2>
                 <p id="videoDescription" class="video-description"></p>

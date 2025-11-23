@@ -1,29 +1,41 @@
-// DOM Elements
-const videoUrlInput = document.getElementById('videoUrl');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const btnText = document.getElementById('btnText');
-const btnLoader = document.getElementById('btnLoader');
-const loadingState = document.getElementById('loadingState');
-const errorState = document.getElementById('errorState');
-const errorMessage = document.getElementById('errorMessage');
-const resultsSection = document.getElementById('resultsSection');
-const videoTitle = document.getElementById('videoTitle');
-const videoDescription = document.getElementById('videoDescription');
-const recommendationReason = document.getElementById('recommendationReason');
-const ideasGrid = document.getElementById('ideasGrid');
+// State
+let selectedFile = null;
 
-// Event Listeners
-videoUrlInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        analyzeVideo();
+// Tab Switching
+function switchTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.closest('.tab-button').classList.add('active');
+
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+
+    if (tab === 'youtube') {
+        document.getElementById('youtubeTab').classList.add('active');
+    } else if (tab === 'tiktok') {
+        document.getElementById('tiktokTab').classList.add('active');
+    } else if (tab === 'image') {
+        document.getElementById('imageTab').classList.add('active');
     }
+
+    // Hide results when switching tabs
+    hideResults();
+    hideError();
+}
+
+// YouTube Analysis
+const youtubeUrlInput = document.getElementById('youtubeUrl');
+youtubeUrlInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') analyzeYouTube();
 });
 
-// Main Analysis Function
-async function analyzeVideo() {
-    const url = videoUrlInput.value.trim();
+async function analyzeYouTube() {
+    const url = youtubeUrlInput.value.trim();
 
-    // Validation
     if (!url) {
         showError('Vui lòng nhập URL video YouTube');
         return;
@@ -34,16 +46,40 @@ async function analyzeVideo() {
         return;
     }
 
-    // Reset states
+    await analyzeVideo(url, '/api/analyze', 'analyzeYouTubeBtn', 'btnTextYT', 'btnLoaderYT');
+}
+
+// TikTok Analysis
+const tiktokUrlInput = document.getElementById('tiktokUrl');
+tiktokUrlInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') analyzeTikTok();
+});
+
+async function analyzeTikTok() {
+    const url = tiktokUrlInput.value.trim();
+
+    if (!url) {
+        showError('Vui lòng nhập URL video TikTok');
+        return;
+    }
+
+    if (!isValidTikTokUrl(url)) {
+        showError('URL không hợp lệ. Vui lòng nhập URL TikTok hợp lệ');
+        return;
+    }
+
+    await analyzeVideo(url, '/api/analyze-tiktok', 'analyzeTikTokBtn', 'btnTextTT', 'btnLoaderTT');
+}
+
+// Generic Video Analysis
+async function analyzeVideo(url, endpoint, btnId, textId, loaderId) {
     hideError();
     hideResults();
-
-    // Show loading
     showLoading();
-    disableButton();
+    disableButton(btnId, textId, loaderId);
 
     try {
-        const response = await fetch('/api/analyze', {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -64,14 +100,128 @@ async function analyzeVideo() {
         showError(error.message || 'Không thể kết nối đến server. Vui lòng thử lại sau.');
     } finally {
         hideLoading();
-        enableButton();
+        enableButton(btnId, textId, loaderId);
+    }
+}
+
+// Image Upload
+const uploadArea = document.getElementById('uploadArea');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+const previewImg = document.getElementById('previewImg');
+const analyzeImageBtn = document.getElementById('analyzeImageBtn');
+
+// Click to upload
+uploadArea.addEventListener('click', () => {
+    imageInput.click();
+});
+
+// File input change
+imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        handleImageFile(file);
+    }
+});
+
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+        handleImageFile(file);
+    } else {
+        showError('Vui lòng chọn file ảnh hợp lệ');
+    }
+});
+
+function handleImageFile(file) {
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+        showError('Kích thước ảnh quá lớn. Vui lòng chọn ảnh < 10MB');
+        return;
+    }
+
+    selectedFile = file;
+
+    // Preview image
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        previewImg.src = e.target.result;
+        uploadArea.classList.add('hidden');
+        imagePreview.classList.remove('hidden');
+        analyzeImageBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeImage() {
+    selectedFile = null;
+    imageInput.value = '';
+    previewImg.src = '';
+    uploadArea.classList.remove('hidden');
+    imagePreview.classList.add('hidden');
+    analyzeImageBtn.disabled = true;
+    hideResults();
+}
+
+async function analyzeImage() {
+    if (!selectedFile) {
+        showError('Vui lòng chọn ảnh để phân tích');
+        return;
+    }
+
+    hideError();
+    hideResults();
+    showLoading();
+    disableButton('analyzeImageBtn', 'btnTextImg', 'btnLoaderImg');
+
+    try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        const response = await fetch('/api/analyze-image', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Có lỗi xảy ra khi phân tích ảnh');
+        }
+
+        const data = await response.json();
+        displayResults(data);
+
+    } catch (error) {
+        console.error('Error:', error);
+        showError(error.message || 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+    } finally {
+        hideLoading();
+        enableButton('analyzeImageBtn', 'btnTextImg', 'btnLoaderImg');
     }
 }
 
 // Display Results
 function displayResults(data) {
-    // Video Info
-    videoTitle.textContent = data.video_title || 'Video YouTube';
+    const videoTitle = document.getElementById('videoTitle');
+    const videoDescription = document.getElementById('videoDescription');
+    const recommendationReason = document.getElementById('recommendationReason');
+    const ideasGrid = document.getElementById('ideasGrid');
+
+    // Video/Image Info
+    videoTitle.textContent = data.video_title || 'Thumbnail Ideas';
     videoDescription.textContent = data.video_description || '';
 
     // Recommendation
@@ -85,12 +235,15 @@ function displayResults(data) {
         ideasGrid.appendChild(ideaCard);
     });
 
-    // Show results with animation
+    // Show results
     showResults();
 
     // Scroll to results
     setTimeout(() => {
-        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('resultsSection').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
     }, 300);
 }
 
@@ -99,7 +252,6 @@ function createIdeaCard(idea, number, isBest) {
     const card = document.createElement('div');
     card.className = 'idea-card' + (isBest ? ' best' : '');
 
-    // Extract colors from color_scheme
     const colors = extractColors(idea.color_scheme);
 
     card.innerHTML = `
@@ -144,7 +296,7 @@ function createIdeaCard(idea, number, isBest) {
     return card;
 }
 
-// Extract Colors from color_scheme string
+// Extract Colors
 function extractColors(colorScheme) {
     const bgMatch = colorScheme.match(/Background:\s*(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3}|\w+)/i);
     const textMatch = colorScheme.match(/Text:\s*(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3}|\w+)/i);
@@ -162,52 +314,70 @@ function isValidYouTubeUrl(url) {
         /^https?:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/,
         /^https?:\/\/(www\.)?youtube\.com\/v\/[\w-]+/
     ];
+    return patterns.some(pattern => pattern.test(url));
+}
 
+function isValidTikTokUrl(url) {
+    const patterns = [
+        /^https?:\/\/(www\.)?tiktok\.com\/@[\w.-]+\/video\/\d+/,
+        /^https?:\/\/(vm|vt)\.tiktok\.com\/[\w]+/,
+    ];
     return patterns.some(pattern => pattern.test(url));
 }
 
 // UI State Management
 function showLoading() {
-    loadingState.classList.remove('hidden');
+    document.getElementById('loadingState').classList.remove('hidden');
 }
 
 function hideLoading() {
-    loadingState.classList.add('hidden');
+    document.getElementById('loadingState').classList.add('hidden');
 }
 
 function showError(message) {
+    const errorMessage = document.getElementById('errorMessage');
+    const errorState = document.getElementById('errorState');
+
     errorMessage.textContent = message;
     errorState.classList.remove('hidden');
 
-    // Auto hide after 5 seconds
-    setTimeout(() => {
-        hideError();
-    }, 5000);
+    setTimeout(() => hideError(), 5000);
 }
 
 function hideError() {
-    errorState.classList.add('hidden');
+    document.getElementById('errorState').classList.add('hidden');
 }
 
 function showResults() {
-    resultsSection.classList.remove('hidden');
+    document.getElementById('resultsSection').classList.remove('hidden');
 }
 
 function hideResults() {
-    resultsSection.classList.add('hidden');
+    document.getElementById('resultsSection').classList.add('hidden');
 }
 
-function disableButton() {
-    analyzeBtn.disabled = true;
-    btnText.classList.add('hidden');
-    btnLoader.classList.remove('hidden');
+function disableButton(btnId, textId, loaderId) {
+    const btn = document.getElementById(btnId);
+    const text = document.getElementById(textId);
+    const loader = document.getElementById(loaderId);
+
+    btn.disabled = true;
+    text.classList.add('hidden');
+    loader.classList.remove('hidden');
 }
 
-function enableButton() {
-    analyzeBtn.disabled = false;
-    btnText.classList.remove('hidden');
-    btnLoader.classList.add('hidden');
+function enableButton(btnId, textId, loaderId) {
+    const btn = document.getElementById(btnId);
+    const text = document.getElementById(textId);
+    const loader = document.getElementById(loaderId);
+
+    btn.disabled = false;
+    text.classList.remove('hidden');
+    loader.classList.add('hidden');
 }
 
 // Initialize
 console.log('🎨 AI Thumbnail Maker - Ready!');
+console.log('✅ YouTube Support');
+console.log('✅ TikTok Support');
+console.log('✅ Image Analysis Support');

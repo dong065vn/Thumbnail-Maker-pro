@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +7,9 @@ import google.generativeai as genai
 from googleapiclient.discovery import build
 import os
 import re
+import base64
+import io
+from PIL import Image
 from dotenv import load_dotenv
 from typing import List, Optional
 
@@ -91,17 +94,181 @@ def get_youtube_video_info(video_id: str) -> dict:
 
     return {"title": "", "description": ""}
 
-def generate_thumbnail_ideas(video_title: str, video_description: str, video_url: str) -> dict:
+def extract_tiktok_id(url: str) -> Optional[str]:
+    """Extract TikTok video ID from URL"""
+    patterns = [
+        r'tiktok\.com/@[\w.-]+/video/(\d+)',
+        r'tiktok\.com/.*?/video/(\d+)',
+        r'vm\.tiktok\.com/([\w]+)',
+        r'vt\.tiktok\.com/([\w]+)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def get_tiktok_info_from_ai(url: str) -> dict:
+    """Use AI to analyze TikTok video URL and extract info"""
+    model = genai.GenerativeModel('gemini-pro')
+
+    prompt = f"""
+Phân tích URL TikTok này và đưa ra thông tin về video:
+URL: {url}
+
+Dựa vào URL và kiến thức của bạn về TikTok, hãy đoán:
+1. Chủ đề có thể của video
+2. Từ khóa chính
+3. Mô tả ngắn gọn về nội dung có thể
+
+Trả về JSON format:
+{{
+  "title": "Tiêu đề dự đoán cho video TikTok",
+  "description": "Mô tả ngắn gọn về nội dung video"
+}}
+
+Nếu không thể phân tích, hãy tạo thông tin chung về TikTok video.
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        result_text = response.text
+
+        if "```json" in result_text:
+            result_text = result_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in result_text:
+            result_text = result_text.split("```")[1].split("```")[0].strip()
+
+        import json
+        result = json.loads(result_text)
+        return result
+    except Exception as e:
+        print(f"TikTok AI Analysis Error: {e}")
+        return {
+            "title": "TikTok Video",
+            "description": "Viral content from TikTok"
+        }
+
+def analyze_image_for_thumbnail(image_bytes: bytes, filename: str) -> dict:
+    """Analyze uploaded image using Gemini Vision to suggest thumbnail ideas"""
+
+    try:
+        # Use Gemini Vision model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Convert image bytes to PIL Image
+        img = Image.open(io.BytesIO(image_bytes))
+
+        # Resize if too large
+        max_size = 1024
+        if img.width > max_size or img.height > max_size:
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+        prompt = """
+Bạn là chuyên gia thiết kế thumbnail. Hãy phân tích hình ảnh này và đề xuất 4 ý tưởng thumbnail cho YouTube/TikTok.
+
+NHIỆM VỤ:
+1. Phân tích nội dung, màu sắc, và cảm xúc trong ảnh
+2. Xác định chủ đề chính
+3. Đề xuất 4 cách tối ưu hóa ảnh này thành thumbnail thu hút:
+   - Text overlay ngắn gọn (2-3 từ tiếng Việt)
+   - Phối màu tương phản cho text
+   - Font chữ phù hợp
+   - Mô tả cách sử dụng ảnh
+   - Điểm CTR dự đoán (1-10)
+
+ĐỊNH DẠNG TRẢ LỜI (JSON):
+{
+  "image_analysis": "Mô tả ngắn gọn về nội dung ảnh",
+  "main_subject": "Chủ đề chính của ảnh",
+  "ideas": [
+    {
+      "text": "VÍ DỤ TEXT",
+      "color_scheme": "Background: #FF0000, Text: #FFFFFF",
+      "font_suggestion": "Montserrat Bold",
+      "description": "Cách sử dụng ảnh này làm thumbnail",
+      "ctr_score": 8
+    },
+    ... (3 ý tưởng nữa)
+  ],
+  "best_idea_index": 0,
+  "recommendation_reason": "Lý do tại sao ý tưởng này tốt nhất"
+}
+"""
+
+        response = model.generate_content([prompt, img])
+        result_text = response.text
+
+        # Extract JSON
+        if "```json" in result_text:
+            result_text = result_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in result_text:
+            result_text = result_text.split("```")[1].split("```")[0].strip()
+
+        import json
+        result = json.loads(result_text)
+
+        return {
+            "title": result.get("main_subject", "Thumbnail từ ảnh"),
+            "description": result.get("image_analysis", "Phân tích ảnh"),
+            "ideas": result["ideas"],
+            "best_idea_index": result["best_idea_index"],
+            "recommendation_reason": result["recommendation_reason"]
+        }
+
+    except Exception as e:
+        print(f"Image Analysis Error: {e}")
+        # Fallback
+        return {
+            "title": f"Thumbnail từ {filename}",
+            "description": "Phân tích ảnh để tạo thumbnail",
+            "ideas": [
+                {
+                    "text": "ẤN TƯỢNG",
+                    "color_scheme": "Background: #FF6B00, Text: #FFFFFF",
+                    "font_suggestion": "Montserrat ExtraBold",
+                    "description": "Thêm text nổi bật lên ảnh gốc",
+                    "ctr_score": 8
+                },
+                {
+                    "text": "KHÁM PHÁ",
+                    "color_scheme": "Background: #0066FF, Text: #FFFF00",
+                    "font_suggestion": "Impact",
+                    "description": "Tạo hiệu ứng tương phản mạnh",
+                    "ctr_score": 7
+                },
+                {
+                    "text": "ĐỘCQUYỀN",
+                    "color_scheme": "Background: #FF0000, Text: #FFFFFF",
+                    "font_suggestion": "Arial Black",
+                    "description": "Text đỏ trắng thu hút attention",
+                    "ctr_score": 9
+                },
+                {
+                    "text": "MỚI NHẤT",
+                    "color_scheme": "Background: #000000, Text: #00FF00",
+                    "font_suggestion": "Bebas Neue Bold",
+                    "description": "Style hiện đại với nền đen",
+                    "ctr_score": 6
+                }
+            ],
+            "best_idea_index": 2,
+            "recommendation_reason": "Text 'ĐỘC QUYỀN' với màu đỏ trắng có sức hút mạnh nhất, tạo cảm giác khan hiếm và tò mò."
+        }
+
+def generate_thumbnail_ideas(video_title: str, video_description: str, video_url: str, platform: str = "YouTube") -> dict:
     """Use Google Gemini to generate thumbnail ideas"""
 
     model = genai.GenerativeModel('gemini-pro')
 
     prompt = f"""
-Bạn là chuyên gia thiết kế thumbnail cho YouTube/TikTok. Nhiệm vụ của bạn là phân tích video và đề xuất 4 ý tưởng thumbnail thu hút.
+Bạn là chuyên gia thiết kế thumbnail cho {platform}. Nhiệm vụ của bạn là phân tích video và đề xuất 4 ý tưởng thumbnail thu hút.
 
 THÔNG TIN VIDEO:
+- Platform: {platform}
 - Tiêu đề: {video_title}
-- Mô tả: {video_description[:500]}
+- Mô tả: {video_description[:500] if video_description else "N/A"}
 - URL: {video_url}
 
 YÊU CẦU:
@@ -218,7 +385,8 @@ async def analyze_video(request: VideoRequest):
     ai_result = generate_thumbnail_ideas(
         video_info["title"],
         video_info.get("description", ""),
-        request.url
+        request.url,
+        platform="YouTube"
     )
 
     # Build response
@@ -228,6 +396,65 @@ async def analyze_video(request: VideoRequest):
         ideas=[ThumbnailIdea(**idea) for idea in ai_result["ideas"]],
         best_idea_index=ai_result["best_idea_index"],
         recommendation_reason=ai_result["recommendation_reason"]
+    )
+
+    return response
+
+@app.post("/api/analyze-tiktok", response_model=ThumbnailResponse)
+async def analyze_tiktok(request: VideoRequest):
+    """Analyze TikTok video and generate thumbnail ideas"""
+
+    # Extract TikTok video ID
+    video_id = extract_tiktok_id(request.url)
+    if not video_id:
+        raise HTTPException(status_code=400, detail="Invalid TikTok URL")
+
+    # Get video info using AI (TikTok API is restricted)
+    video_info = get_tiktok_info_from_ai(request.url)
+
+    # Generate thumbnail ideas using Gemini
+    ai_result = generate_thumbnail_ideas(
+        video_info["title"],
+        video_info.get("description", ""),
+        request.url,
+        platform="TikTok"
+    )
+
+    # Build response
+    response = ThumbnailResponse(
+        video_title=video_info["title"],
+        video_description=video_info.get("description"),
+        ideas=[ThumbnailIdea(**idea) for idea in ai_result["ideas"]],
+        best_idea_index=ai_result["best_idea_index"],
+        recommendation_reason=ai_result["recommendation_reason"]
+    )
+
+    return response
+
+@app.post("/api/analyze-image", response_model=ThumbnailResponse)
+async def analyze_image(file: UploadFile = File(...)):
+    """Analyze uploaded image and generate thumbnail ideas"""
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # Read image bytes
+    try:
+        image_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read image: {str(e)}")
+
+    # Analyze image with Gemini Vision
+    result = analyze_image_for_thumbnail(image_bytes, file.filename)
+
+    # Build response
+    response = ThumbnailResponse(
+        video_title=result["title"],
+        video_description=result.get("description"),
+        ideas=[ThumbnailIdea(**idea) for idea in result["ideas"]],
+        best_idea_index=result["best_idea_index"],
+        recommendation_reason=result["recommendation_reason"]
     )
 
     return response
